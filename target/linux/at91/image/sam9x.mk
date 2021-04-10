@@ -130,3 +130,26 @@ define Device/wb45n
   MKUBIFS_OPTS := -m $$(PAGESIZE) -e 124KiB -c 955
 endef
 TARGET_DEVICES += wb45n
+
+define Build/rth9580wf01-firmware
+  dd bs=64K count=256 if=/dev/zero | tr '\000' '\377' > $(1).new
+  dd bs=64K seek=0  conv=notrunc of=$(1).new if=$(BIN_DIR)/at91bootstrap-$(DEVICE_NAME)_uboot/at91bootstrap.bin
+  dd bs=64K seek=1  conv=notrunc of=$(1).new if=$(BIN_DIR)/u-boot-$(DEVICE_NAME)_spiflash/u-boot.bin
+  dd bs=64K seek=12 conv=notrunc of=$(1).new if=$(BIN_DIR)/$(KERNEL_IMAGE)
+  dd bs=64K seek=76 conv=notrunc of=$(1).new if=$(BIN_DIR)/$(IMAGE_PREFIX)-squashfs-rootfs.bin
+  mv $(1).new $(1)
+endef
+
+define Device/rth9580wf01
+  DEVICE_TITLE := Resideo RTH9580WF01
+  BLOCKSIZE := 64k
+
+  KERNEL := kernel-bin | lzma | uImage lzma
+  KERNEL_INSTALL := 1
+  KERNEL_SUFFIX := -uImage
+
+  IMAGES := rootfs.bin firmware.bin
+  IMAGE/rootfs.bin := append-rootfs
+  IMAGE/firmware.bin := rth9580wf01-firmware $$(BIN_DIR)/$$(IMAGE_PREFIX)-firmware.bin
+endef
+TARGET_DEVICES += rth9580wf01

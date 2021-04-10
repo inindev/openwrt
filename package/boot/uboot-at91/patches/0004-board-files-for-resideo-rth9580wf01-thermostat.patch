@@ -80,10 +80,10 @@ index 0000000000..ceb848b36f
 +obj-y += rth9580wf01.o
 diff --git a/board/resideo/rth9580wf01/rth9580wf01.c b/board/resideo/rth9580wf01/rth9580wf01.c
 new file mode 100644
-index 0000000000..d858d85168
+index 0000000000..d2048e66b7
 --- /dev/null
 +++ b/board/resideo/rth9580wf01/rth9580wf01.c
-@@ -0,0 +1,136 @@
+@@ -0,0 +1,132 @@
 +/*
 + * Copyright (C) 2012 Atmel Corporation
 + *
@@ -92,13 +92,8 @@ index 0000000000..d858d85168
 +
 +#include <common.h>
 +#include <dm.h>
-+#include <asm/io.h>
-+#include <asm/arch/at91sam9x5_matrix.h>
-+#include <asm/arch/at91sam9_smc.h>
 +#include <asm/arch/at91_common.h>
-+#include <asm/arch/at91_rstc.h>
 +#include <asm/arch/clk.h>
-+#include <asm/arch/gpio.h>
 +#include <debug_uart.h>
 +#include <atmel_lcd.h>
 +#include <version.h>
@@ -137,12 +132,13 @@ index 0000000000..d858d85168
 +			strmhz(temp, get_cpu_clk_rate()));
 +
 +	len += sprintf(&buf[len], "%d MB SDRAM, 16 MB Flash\n",
-+		       CONFIG_SYS_SDRAM_SIZE >> 20);
++			CONFIG_SYS_SDRAM_SIZE >> 20);
 +
 +	ret = uclass_get_device(UCLASS_VIDEO, 0, &dev);
 +	if (ret)
 +		return ret;
 +
++	 /* rotate the logo 180 degrees, then move to lower-right */
 +	get_microchip_logo_info(&logo_info);
 +	p = (char*)logo_info.logo_addr;
 +	i = *(int*)(logo_info.logo_addr + 10);
@@ -155,8 +151,8 @@ index 0000000000..d858d85168
 +
 +	vid = dev_get_uclass_priv(dev);
 +	ret = video_bmp_display(dev, logo_info.logo_addr,
-+				vid->xsize - logo_info.logo_width,
-+				vid->ysize - logo_info.logo_height,
++				vid->xsize - logo_info.logo_width - 4,
++				vid->ysize - logo_info.logo_height - 2,
 +				false);
 +	if (ret)
 +		return ret;
@@ -165,7 +161,7 @@ index 0000000000..d858d85168
 +	if (ret)
 +		return ret;
 +
-+	vidconsole_position_cursor(con, 0, (logo_info.logo_height + 8));
++	vidconsole_position_cursor(con, 0, (logo_info.logo_height + 10));
 +	for (s = buf, i = 0; i < len; s++, i++)
 +		vidconsole_put_char(con, *s);
 +
