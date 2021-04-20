@@ -1,0 +1,41 @@
+diff --git a/Config.in.kernel b/Config.in.kernel
+index 3cf7d5a..a38f68c 100644
+--- a/Config.in.kernel
++++ b/Config.in.kernel
+@@ -63,6 +63,7 @@ config CONFIG_MEM_BANK
+ 
+ config CONFIG_MEM_SIZE
+ 	string "Extern Memory Bank Size"
++	default "0x1000000" if CONFIG_RAM_16MB
+ 	default "0x2000000" if CONFIG_RAM_32MB
+ 	default "0x4000000" if CONFIG_RAM_64MB
+ 	default "0x8000000" if CONFIG_RAM_128MB
+diff --git a/driver/Config.in.memory b/driver/Config.in.memory
+index ab20d3b..7b7161a 100644
+--- a/driver/Config.in.memory
++++ b/driver/Config.in.memory
+@@ -49,6 +49,9 @@ choice
+ 	depends on CONFIG_SDRAM || CONFIG_SDDRC || CONFIG_DDRC
+ 	default CONFIG_RAM_64MB
+ 
++config	CONFIG_RAM_16MB
++	bool "16 MB"
++
+ config	CONFIG_RAM_32MB
+ 	bool "32 MB"
+ 
+diff --git a/driver/driver_cpp.mk b/driver/driver_cpp.mk
+index fa1e9a0..cbc6fc2 100644
+--- a/driver/driver_cpp.mk
++++ b/driver/driver_cpp.mk
+@@ -52,6 +52,10 @@ endif
+ 
+ # SDRAM/DDR/DDR2 size
+ 
++ifeq ($(CONFIG_RAM_16MB),y)
++CPPFLAGS += -DCONFIG_RAM_16MB
++endif
++
+ ifeq ($(CONFIG_RAM_32MB),y)
+ CPPFLAGS += -DCONFIG_RAM_32MB
+ endif

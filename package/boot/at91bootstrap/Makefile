@@ -107,6 +107,12 @@ define AT91Bootstrap/sama5d2_ptc_eksd_uboot
   BUILD_DEVICES:=at91-sama5d2_ptc_ek
 endef
 
+define AT91Bootstrap/rth9580wf01_uboot
+  TITLE:=AT91Bootstrap for Resideo RTH9580WF01 board (SPI Flash)
+  BUILD_SUBTARGET:=sam9x
+  BUILD_DEVICES:=rth9580wf01
+endef
+
 AT91BOOTSTRAP_TARGETS := \
     sama5d2_xplaineddf_uboot \
     sama5d2_xplaineddf_qspi_uboot \
@@ -119,7 +125,8 @@ AT91BOOTSTRAP_TARGETS := \
 	sama5d27_som1_eksd_uboot \
 	sama5d27_som1_ekqspi_uboot \
 	sama5d2_ptc_eknf_uboot \
-    sama5d2_ptc_eksd_uboot
+    sama5d2_ptc_eksd_uboot \
+    rth9580wf01_uboot
 
 define Build/Compile
 	+$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR) \

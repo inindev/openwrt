@@ -1,0 +1,97 @@
+diff --git a/driver/common.c b/driver/common.c
+index 17f824d..13498d5 100644
+--- a/driver/common.c
++++ b/driver/common.c
+@@ -141,7 +141,7 @@ void load_image_done(int retval)
+ 		usart_puts(media);
+ 
+ 	if (retval == 0){
+-		usart_puts("Done to load image\n");
++		usart_puts("Done loading image\n");
+ 	}
+ 	if (retval == -1) {
+ 		usart_puts("Failed to load image\n");
+diff --git a/driver/spi_flash.c b/driver/spi_flash.c
+index 2b5ac9b..91efb01 100644
+--- a/driver/spi_flash.c
++++ b/driver/spi_flash.c
+@@ -45,13 +45,15 @@
+ 
+ /* JEDEC Code */
+ #define MANUFACTURER_ID_ATMEL		0x1f
++#define MANUFACTURER_ID_ISSI		0x9d
+ #define MANUFACTURER_ID_MICRON		0x20
+ #define MANUFACTURER_ID_WINBOND		0xef
+ 
+ /* Family Code */
+ #define DF_FAMILY_AT26F			0x00
+ #define DF_FAMILY_AT45			0x20
+-#define DF_FAMILY_AT26DF		0x40	/* AT25DF and AT26DF */
++#define DF_FAMILY_AT26DF		0x40	/* AT25DF and AT26DF   */
++#define DF_FAMILY_AT25FS		0x60	/* AT25F and AT25FSxxx */
+ 
+ #define DF_FAMILY_N25Q			0xA0
+ #define DF_FAMILY_M25P			0x20
+@@ -451,7 +453,8 @@ static int dataflash_recovery(struct dataflash_descriptor *df_desc)
+ 		dbg_info("SF: The page 0 is erasing...\n");
+ 
+ 		if ((df_desc->family == DF_FAMILY_AT26F)
+-			|| (df_desc->family == DF_FAMILY_AT26DF))
++			|| (df_desc->family == DF_FAMILY_AT26DF)
++			|| (df_desc->family == DF_FAMILY_AT25FS))
+ 			ret = dataflash_page0_erase_at25();
+ 		 else
+ 			ret = dataflash_page0_erase_at45();
+@@ -583,10 +586,12 @@ static int df_desc_init(struct dataflash_descriptor *df_desc, unsigned char vend
+ 
+ 	switch ( vendor ) {
+ 		case MANUFACTURER_ID_ATMEL:
++		case MANUFACTURER_ID_ISSI:
+ 		case MANUFACTURER_ID_WINBOND: {
+ 
+ 			if ((df_desc->family == DF_FAMILY_AT26F)
+-				|| (df_desc->family == DF_FAMILY_AT26DF)) {
++				|| (df_desc->family == DF_FAMILY_AT26DF)
++				|| (df_desc->family == DF_FAMILY_AT25FS)) {
+ 				ret = df_at25_desc_init(df_desc);
+ 				if (ret)
+ 					return ret;
+@@ -619,7 +624,7 @@ static int df_desc_init(struct dataflash_descriptor *df_desc, unsigned char vend
+ 		break;
+ 
+ 		default:
+-			dbg_info("SF: Unsupported Manufactorer ID %x\n", vendor);
++			dbg_info("SF: Unsupported Manufacturer ID %x\n", vendor);
+ 			return -1;
+ 	}
+ 
+@@ -648,9 +653,10 @@ static int dataflash_probe_atmel(struct dataflash_descriptor *df_desc)
+ #endif
+ 
+ 	if (dev_id[0] != MANUFACTURER_ID_ATMEL &&
++	    dev_id[0] != MANUFACTURER_ID_ISSI &&
+ 	    dev_id[0] != MANUFACTURER_ID_WINBOND &&
+ 	    dev_id[0] != MANUFACTURER_ID_MICRON) {
+-		dbg_info("Not supported spi flash Manufactorer ID: %x\n",
++		dbg_info("SF: Not supported spi flash Manufacturer ID: %x\n",
+ 			 dev_id[0]);
+ 		return -1;
+ 	}
+@@ -709,7 +715,7 @@ int spi_flash_loadimage(struct image_info *image)
+ 
+ 	ret = read_array(df_desc, image->offset, image->length, image->dest);
+ 	if (ret) {
+-		dbg_info("** SF: Serial flash read error**\n");
++		dbg_info("** SF: Serial flash read error **\n");
+ 		ret = -1;
+ 		goto err_exit;
+ 	}
+@@ -728,7 +734,7 @@ int spi_flash_loadimage(struct image_info *image)
+ 	ret = read_array(df_desc,
+ 		image->of_offset, image->of_length, image->of_dest);
+ 	if (ret) {
+-		dbg_info("** SF: DT: Serial flash read error**\n");
++		dbg_info("** SF: DT: Serial flash read error **\n");
+ 		ret = -1;
+ 		goto err_exit;
+ 	}
