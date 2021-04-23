@@ -105,6 +105,12 @@ define U-Boot/sama5d2_ptc_ek_mmc
   BUILD_DEVICES:=at91-sama5d2_ptc_ek
 endef
 
+define U-Boot/rth9580wf01_spiflash
+  NAME:=Resideo RTH9580WF01 board (SPI Flash)
+  BUILD_SUBTARGET:=sam9x
+  BUILD_DEVICES:=rth9580wf01
+endef
+
 UBOOT_TARGETS := \
 	at91sam9m10g45ek_nandflash \
 	at91sam9x5ek_nandflash \
@@ -118,7 +124,8 @@ UBOOT_TARGETS := \
     sama5d27_som1_ek_mmc \
     sama5d27_som1_ek_spiflash \
 	sama5d2_ptc_ek_nandflash \
-	sama5d2_ptc_ek_mmc
+	sama5d2_ptc_ek_mmc \
+	rth9580wf01_spiflash
 
 define Build/Compile
   +$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR) \
