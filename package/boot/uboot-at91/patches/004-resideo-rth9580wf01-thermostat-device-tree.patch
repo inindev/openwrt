@@ -1,9 +1,9 @@
 diff --git a/arch/arm/dts/rth9580wf01.dts b/arch/arm/dts/rth9580wf01.dts
 new file mode 100644
-index 0000000000..f77c94579d
+index 0000000000..a195a812a3
 --- /dev/null
 +++ b/arch/arm/dts/rth9580wf01.dts
-@@ -0,0 +1,154 @@
+@@ -0,0 +1,153 @@
 +/*
 + * rth9580wf01.dts - Device Tree file for RTH9580WF01 Thermostat Board
 + *
@@ -88,7 +88,6 @@ index 0000000000..f77c94579d
 +				pinctrl-names = "default";
 +				pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_pwm &pinctrl_lcd_rgb888>;
 +				rotate = <2>;
-+
 +				status = "okay";
 +				u-boot,dm-pre-reloc;
 +
@@ -160,10 +159,10 @@ index 0000000000..f77c94579d
 +};
 diff --git a/arch/arm/dts/rth9580wf01.dtsi b/arch/arm/dts/rth9580wf01.dtsi
 new file mode 100644
-index 0000000000..c36c9857c0
+index 0000000000..c250559011
 --- /dev/null
 +++ b/arch/arm/dts/rth9580wf01.dtsi
-@@ -0,0 +1,1293 @@
+@@ -0,0 +1,1292 @@
 +/*
 + * rth9580wf01.dtsi - Device Tree Include file for RTH9580WF01 Thermostat Board
 + *
@@ -632,12 +631,11 @@ index 0000000000..c36c9857c0
 +
 +				/* shared pinctrl settings */
 +				dbgu {
-+					u-boot,dm-pre-reloc;
 +					pinctrl_dbgu: dbgu-0 {
-+						u-boot,dm-pre-reloc;
 +						atmel,pins =
 +							<AT91_PIOA 9 AT91_PERIPH_A AT91_PINCTRL_PULL_UP
 +							 AT91_PIOA 10 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++						u-boot,dm-pre-reloc;
 +					};
 +				};
 +
@@ -1457,3 +1455,4 @@ index 0000000000..c36c9857c0
 +		status = "disabled";
 +	};
 +};
+
