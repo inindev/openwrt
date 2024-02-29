@@ -22,6 +22,9 @@ rockchip_setup_interfaces()
 	friendlyarm,nanopi-r5s)
 		ucidef_set_interfaces_lan_wan 'eth1 eth2' 'eth0'
 		;;
+	radxa,e25)
+		ucidef_set_interfaces_lan_wan 'eth0' 'eth1'
+		;;
 	*)
 		ucidef_set_interface_lan 'eth0'
 		;;
@@ -52,6 +55,10 @@ rockchip_setup_macs()
 		lan_mac=$(macaddr_setbit_la "$wan_mac")
 		;;
 	friendlyarm,nanopi-r5c)
+		wan_mac=$(macaddr_generate_from_mmc_cid mmcblk*)
+		lan_mac=$(macaddr_add "$wan_mac" 1)
+		;;
+	radxa,e25)
 		wan_mac=$(macaddr_generate_from_mmc_cid mmcblk*)
 		lan_mac=$(macaddr_add "$wan_mac" 1)
 		;;
