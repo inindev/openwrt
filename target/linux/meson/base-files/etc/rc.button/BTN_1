@@ -1,0 +1,6 @@
+#!/bin/sh
+# ACTION=pressed|released -- timeout if pressed returns a number
+# BUTTON=BTN_1
+# SEEN=seconds -- whole seconds since last event (hold time on released)
+[ "$ACTION" = "released" ] || exit 0
+logger -t button "held ${SEEN}s"

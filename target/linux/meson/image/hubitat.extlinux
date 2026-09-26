@@ -1,0 +1,4 @@
+label openwrt
+	kernel /Image
+	fdt /meson-axg-hubitat-c7.dtb
+	append @CMDLINE@
