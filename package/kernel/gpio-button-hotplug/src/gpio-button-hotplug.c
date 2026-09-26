@@ -24,6 +24,7 @@
 #include <linux/kobject.h>
 #include <linux/input.h>
 #include <linux/interrupt.h>
+#include <linux/irq.h>
 #include <linux/platform_device.h>
 #include <linux/of_irq.h>
 #include <linux/gpio.h>
@@ -59,6 +60,7 @@ struct gpio_keys_button_data {
 	int threshold;
 	int can_sleep;
 	int irq;
+	int irq2;
 	unsigned int software_debounce;
 	struct gpio_desc *gpiod;
 	const struct gpio_keys_button *b;
@@ -250,6 +252,19 @@ static int gpio_button_get_value(struct gpio_keys_button_data *bdata)
 	return val;
 }
 
+static void gpio_keys_arm_next_edge(struct gpio_keys_button_data *bdata)
+{
+	unsigned int type;
+
+	if (!bdata->irq || bdata->irq2)
+		return;
+
+	/* gpiod is logical; gpio_intc watches the pad */
+	type = gpio_button_get_value(bdata) ?
+		IRQ_TYPE_EDGE_RISING : IRQ_TYPE_EDGE_FALLING;
+	irq_set_irq_type(bdata->irq, type);
+}
+
 static void gpio_keys_handle_button(struct gpio_keys_button_data *bdata)
 {
 	unsigned int type = bdata->b->type ?: EV_KEY;
@@ -276,6 +291,7 @@ static void gpio_keys_handle_button(struct gpio_keys_button_data *bdata)
 	} else if (bdata->last_state == state) {
 		/* reset asserted counter (only relevant for polled keys) */
 		bdata->count = 0;
+		gpio_keys_arm_next_edge(bdata);
 		return;
 	}
 
@@ -294,6 +310,7 @@ static void gpio_keys_handle_button(struct gpio_keys_button_data *bdata)
 set_state:
 	bdata->last_state = state;
 	bdata->count = 0;
+	gpio_keys_arm_next_edge(bdata);
 }
 
 struct gpio_keys_button_dev {
@@ -500,13 +517,6 @@ static int gpio_keys_button_probe(struct platform_device *pdev,
 			goto out;
 		}
 
-		if (button->irq) {
-			dev_err(dev, "skipping button %s (only gpio buttons supported)\n",
-				button->desc);
-			bdata->b = &pdata->buttons[i];
-			continue;
-		}
-
 		if (gpio_is_valid(button->gpio)) {
 			/* legacy platform data... but is it the lookup table? */
 			bdata->gpiod = devm_gpiod_get_index(dev, desc, i,
@@ -534,6 +544,8 @@ static int gpio_keys_button_probe(struct platform_device *pdev,
 			bdata->gpiod = devm_fwnode_gpiod_get(dev,
 				of_fwnode_handle(child), NULL, GPIOD_IN,
 				desc);
+			if (child)
+				bdata->irq2 = irq_of_parse_and_map(child, 1);
 
 			prev = child;
 		}
@@ -620,13 +632,20 @@ static int gpio_keys_probe(struct platform_device *pdev)
 			bdata->irq, NULL, button_handle_irq,
 			irqflags, dev_name(&pdev->dev), bdata);
 		if (ret < 0) {
-			bdata->irq = 0;
 			dev_err(&pdev->dev, "failed to request irq:%d for gpio:%d\n",
 				bdata->irq, button->gpio);
+			bdata->irq = 0;
 			continue;
-		} else {
-			dev_dbg(&pdev->dev, "gpio:%d has irq:%d\n",
-				button->gpio, bdata->irq);
+		}
+		if (bdata->irq2) {
+			ret = devm_request_threaded_irq(&pdev->dev,
+				bdata->irq2, NULL, button_handle_irq,
+				IRQF_ONESHOT, dev_name(&pdev->dev), bdata);
+			if (ret < 0) {
+				dev_err(&pdev->dev, "failed to request irq:%d for gpio:%d\n",
+					bdata->irq2, button->gpio);
+				bdata->irq2 = 0;
+			}
 		}
 	}
 
@@ -662,7 +681,10 @@ static void gpio_keys_irq_close(struct gpio_keys_button_dev *bdev)
 	for (i = 0; i < pdata->nbuttons; i++) {
 		struct gpio_keys_button_data *bdata = &bdev->data[i];
 
-		disable_irq(bdata->irq);
+		if (bdata->irq)
+			disable_irq(bdata->irq);
+		if (bdata->irq2)
+			disable_irq(bdata->irq2);
 		cancel_delayed_work_sync(&bdata->work);
 	}
 }
