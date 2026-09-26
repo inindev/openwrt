@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+. /lib/functions/uci-defaults.sh
+
+board_config_update
+
+case "$(board_name)" in
+hubitat,elevation-c7)
+	ucidef_set_led_heartbeat "blue" "blue" "blue"
+	;;
+esac
+
+board_config_flush
+
+exit 0

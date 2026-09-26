@@ -1,0 +1,62 @@
+From b7e88e89bc2f689423712da7e190310c6847ed42 Mon Sep 17 00:00:00 2001
+From: Neil Armstrong <neil.armstrong@linaro.org>
+Date: Wed, 22 Apr 2026 10:48:58 +0200
+Subject: [PATCH] clk: meson: axg: do not fail when setting SD_EMMC_x_CLK0
+
+Port of 723f14c946cb ("clk: meson: do not fail when setting
+SD_EMMC_x_CLK0") from g12a.c/gxbb.c. AXG never grew set_rate, so
+Linux v7.0 assigned-clocks / assigned-clock-rates on sd_emmc_c
+make clk_set_defaults() fail before meson_mmc_probe.
+
+AXG has no CLKID_SD_EMMC_A_CLK0; only B and C exist.
+
+Signed-off-by: Neil Armstrong <neil.armstrong@linaro.org>
+---
+ drivers/clk/meson/axg.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+--- a/drivers/clk/meson/axg.c
++++ b/drivers/clk/meson/axg.c
+@@ -284,6 +284,34 @@ static ulong meson_clk_get_rate(struct c
+ 	return meson_clk_get_rate_by_id(clk, clk->id);
+ }
+ 
++static ulong meson_clk_set_rate_by_id(struct clk *clk, unsigned long id,
++				      ulong rate)
++{
++	switch (id) {
++	case CLKID_SD_EMMC_B_CLK0:
++	case CLKID_SD_EMMC_C_CLK0:
++		/* TOFIX: implement rate set for MMC clocks */
++		return 0;
++	default:
++		return -ENOENT;
++	}
++}
++
++static ulong meson_clk_set_rate(struct clk *clk, ulong rate)
++{
++	ulong current_rate = meson_clk_get_rate_by_id(clk, clk->id);
++	int ret;
++
++	if (IS_ERR_VALUE(current_rate))
++		return current_rate;
++
++	ret = meson_clk_set_rate_by_id(clk, clk->id, rate);
++	if (IS_ERR_VALUE(ret))
++		return ret;
++
++	return 0;
++}
++
+ static int meson_clk_probe(struct udevice *dev)
+ {
+ 	struct meson_clk *priv = dev_get_priv(dev);
+@@ -308,6 +336,7 @@ static struct clk_ops meson_clk_ops = {
+ 	.disable	= meson_clk_disable,
+ 	.enable		= meson_clk_enable,
+ 	.get_rate	= meson_clk_get_rate,
++	.set_rate	= meson_clk_set_rate,
+ };
+ 
+ static const struct udevice_id meson_clk_ids[] = {
