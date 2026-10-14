@@ -1,0 +1,163 @@
+name: Publish Hubitat C7
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Actions run id of a finished Hubitat C7 build
+        required: true
+        type: string
+
+concurrency:
+  group: hubitat-c7-publish
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    outputs:
+      feed_url: ${{ steps.meta.outputs.feed_url }}
+      head_sha: ${{ steps.meta.outputs.head_sha }}
+    steps:
+      - name: Download build artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::run id must be the number from the Actions run URL"
+            exit 1
+          fi
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name hubitat-c7-kmods --dir kmods
+
+      - name: Merge feed into gh-pages
+        id: meta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+          mapfile -t adbs < <(find kmods -path '*/targets/meson/axg/kmods/*/packages.adb' -type f)
+          if [ "${#adbs[@]}" -ne 1 ]; then
+            echo "::error::expected one meson/axg kmod index, found ${#adbs[@]}"
+            find kmods -type f | head
+            exit 1
+          fi
+          adb=${adbs[0]}
+          feed_root=${adb%%/targets/*}
+          rel=${adb#"$feed_root"/}
+          feed_dir=${rel%/packages.adb}
+
+          # deploy-pages replaces the whole site, so devices on older kernels
+          # would lose their feed. gh-pages holds every published feed as a
+          # single commit; merge this one in and deploy the whole tree.
+          git init -q site
+          git -C site remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git -C site ls-remote --exit-code --heads origin gh-pages >/dev/null; then
+            git -C site fetch -q --depth 1 origin gh-pages
+            git -C site checkout -q FETCH_HEAD
+          fi
+          rm -rf "site/${feed_dir}"
+          mkdir -p "site/${feed_dir}"
+          cp -a "${feed_root}/${feed_dir}/." "site/${feed_dir}/"
+
+          bytes=$(du -sb --exclude=.git site | cut -f1)
+          limit=$((900 * 1024 * 1024))
+          echo "pages site size: ${bytes} bytes (limit ${limit})"
+          if [ "$bytes" -gt "$limit" ]; then
+            echo "::error::pages site would be ${bytes} bytes, over the 900 MiB GitHub Pages limit. Remove old kmods/ directories from gh-pages. Nothing was published."
+            exit 1
+          fi
+
+          git -C site checkout -q --orphan publish
+          git -C site add -A
+          git -C site -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com \
+            commit -q -m "Publish Hubitat C7 feeds from run ${RUN_ID}"
+          git -C site push -q -f origin HEAD:refs/heads/gh-pages
+
+          feed_url="https://inindev.github.io/openwrt/${rel}"
+          head_sha=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)
+          echo "feed_url=${feed_url}" >> "$GITHUB_OUTPUT"
+          echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Publish Hubitat C7"
+            echo
+            echo "Build run: \`${RUN_ID}\`"
+            echo
+            echo "Feed: \`${feed_url}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: stage
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+  release:
+    needs: [stage, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Publish rolling prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          FEED_URL: ${{ needs.stage.outputs.feed_url }}
+          HEAD_SHA: ${{ needs.stage.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name hubitat-c7-firmware --dir firmware
+          mapfile -t bundles < <(find firmware -type f -name '*.tar.gz')
+          if [ "${#bundles[@]}" -ne 1 ] || [ ! -s "${bundles[0]}.sha256" ]; then
+            echo "::error::firmware artifact must hold one .tar.gz and its .sha256"
+            find firmware -type f
+            exit 1
+          fi
+          bundle=${bundles[0]}
+          (cd "$(dirname "$bundle")" && sha256sum -c "$(basename "$bundle").sha256")
+          notes=$(mktemp)
+          printf '%s\n' \
+            "Hubitat Elevation C7 firmware and matching kernel modules." \
+            "" \
+            "Build run: ${RUN_ID}" \
+            "Commit: ${HEAD_SHA}" \
+            "Feed: ${FEED_URL}" \
+            "" \
+            "$(basename "$bundle") contains:" \
+            "" \
+            '```' \
+            "$(tar -tzf "$bundle" | grep -v '/$')" \
+            '```' \
+            "" \
+            "Install a module on a device flashed from this run with apk update and apk add." \
+            > "$notes"
+          gh release delete hubitat-c7 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+          gh release create hubitat-c7 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$HEAD_SHA" \
+            --prerelease \
+            --title "Hubitat C7" \
+            --notes-file "$notes" \
+            "$bundle" \
+            "${bundle}.sha256"
